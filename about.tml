@@ -1,0 +1,33 @@
+<tml>
+	<head>
+		<style href="css/public.css"/>
+		<script src="commonJs/tools.js"/>
+		<script src="commonJs/common.js"/>
+		<script src="dynamicJs/about.js"/>
+	</head>
+	<body>
+		<vbox>                     
+			<hpanel class="head_title">
+				<group class="vcenter group_img" onclick="back()">
+					<img class="vcenter back_img" src="img/menu/1.png"/>
+				</group>
+				<label value="${AboutSunline} " class="center vcenter fs_18"/>
+			</hpanel>
+			<vpanel class="w100">
+				<vpanel class="h30 center">
+					<img class="center vbottom" src="img/mine/7.png"/>
+				</vpanel>
+				<label value="${aboutTml0}" class="fs_24 fc_blue1 center"/>	
+				<hpanel class="h20 w100">
+					<label value="${aboutTml1}IT${aboutTml2}" class="fb fs_22 fc_blue1 vcenter center"/>
+				</hpanel>
+				<vbox class="w100 h15">
+					<label value="${aboutTml3} : www.sunline.cn" class="center fc_blue1"/>
+					<label value="${aboutTml4} : 0755-8616 8118" class="center fc_blue1"/>
+					<label value="" id="appversion" class="center pd_1 fc_blue1"/>
+					<label value="" id="resourceVersion" class="center pd_1 fc_blue1"/>
+				</vbox>
+			</vpanel>
+		</vbox>
+	</body>
+</tml>
