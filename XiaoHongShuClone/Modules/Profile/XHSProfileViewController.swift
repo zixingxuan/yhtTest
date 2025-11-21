@@ -9,10 +9,8 @@ class XHSProfileViewController: XHSBaseViewController {
     private let scrollView = UIScrollView()
     private let contentView = UIView()
     
-    // 顶部个人信息区域
+    // 个人信息区域
     private let avatarImageView = UIImageView()
-    private let menuButton = UIButton(type: .system) // 左上角菜单按钮
-    private let shareButton = UIButton(type: .system) // 右上角分享按钮
     private let usernameLabel = UILabel()
     private let userIdLabel = UILabel()
     private let locationLabel = UILabel()
@@ -54,8 +52,8 @@ class XHSProfileViewController: XHSBaseViewController {
         title = "我"
         view.backgroundColor = UIColor(red: 0.227, green: 0.188, blue: 0.259, alpha: 1.0) // 深灰紫背景
         
+        setupNavigationBar()
         setupScrollView()
-        setupTopBar()
         setupProfileHeader()
         setupStatsView()
         setupFeatureCards()
@@ -104,16 +102,44 @@ class XHSProfileViewController: XHSBaseViewController {
         }
     }
     
-    private func setupTopBar() {
-        // 菜单按钮
-        menuButton.setImage(UIImage(systemName: "line.horizontal.3"), for: .normal)
-        menuButton.tintColor = .white
-        contentView.addSubview(menuButton)
-        
-        // 分享按钮（包含分屏和箭头图标）
-        shareButton.setImage(UIImage(systemName: "square.and.arrow.up"), for: .normal)
-        shareButton.tintColor = .white
-        contentView.addSubview(shareButton)
+    private func setupNavigationBar() {
+        // 设置导航栏背景色
+        if let navController = navigationController {
+            navController.navigationBar.backgroundColor = UIColor(red: 0.227, green: 0.188, blue: 0.259, alpha: 1.0)
+            navController.navigationBar.barTintColor = UIColor(red: 0.227, green: 0.188, blue: 0.259, alpha: 1.0)
+            navController.navigationBar.isTranslucent = false
+            navController.navigationBar.titleTextAttributes = [.foregroundColor: UIColor.white]
+            
+            // 左侧菜单按钮
+            let menuButtonItem = UIBarButtonItem(
+                image: UIImage(systemName: "line.horizontal.3"),
+                style: .plain,
+                target: self,
+                action: #selector(menuButtonTapped)
+            )
+            menuButtonItem.tintColor = .white
+            navigationItem.leftBarButtonItem = menuButtonItem
+            
+            // 右侧分享按钮
+            let shareButtonItem = UIBarButtonItem(
+                image: UIImage(systemName: "square.and.arrow.up"),
+                style: .plain,
+                target: self,
+                action: #selector(shareButtonTapped)
+            )
+            shareButtonItem.tintColor = .white
+            navigationItem.rightBarButtonItem = shareButtonItem
+        }
+    }
+    
+    @objc private func menuButtonTapped() {
+        // 处理菜单按钮点击
+        print("菜单按钮被点击")
+    }
+    
+    @objc private func shareButtonTapped() {
+        // 处理分享按钮点击
+        print("分享按钮被点击")
     }
     
     private func setupProfileHeader() {
@@ -293,6 +319,10 @@ class XHSProfileViewController: XHSBaseViewController {
             layout.minimumLineSpacing = 10
             layout.minimumInteritemSpacing = 10
             layout.sectionInset = UIEdgeInsets(top: 0, left: 10, bottom: 0, right: 10)
+            // 设置两列布局
+            let screenWidth = UIScreen.main.bounds.width
+            let cellWidth = (screenWidth - 3 * 10) / 2 // 两个cell，三个间距（左右边距和中间间距）
+            layout.itemSize = CGSize(width: cellWidth, height: cellWidth + 40) // 加上标题和统计的高度
         }
         
         contentView.addSubview(searchButton)
@@ -300,22 +330,9 @@ class XHSProfileViewController: XHSBaseViewController {
     }
     
     private func setupConstraints() {
-        // 顶部栏约束
-        menuButton.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(10)
-            make.leading.equalToSuperview().offset(16)
-            make.width.height.equalTo(24)
-        }
-        
-        shareButton.snp.makeConstraints { make in
-            make.top.equalToSuperview().offset(10)
-            make.trailing.equalToSuperview().offset(-16)
-            make.width.height.equalTo(24)
-        }
-        
         // 头像和信息约束
         avatarImageView.snp.makeConstraints { make in
-            make.top.equalTo(menuButton.snp.bottom).offset(20)
+            make.top.equalToSuperview().offset(20)
             make.leading.equalToSuperview().offset(16)
             make.width.height.equalTo(80)
         }
@@ -395,7 +412,6 @@ class XHSProfileViewController: XHSBaseViewController {
             make.top.equalTo(notesSegmentedControl.snp.bottom).offset(10)
             make.leading.trailing.equalToSuperview()
             make.bottom.equalToSuperview().offset(-20)
-            make.height.equalTo(300) // 临时高度，实际会根据内容调整
         }
     }
     

@@ -135,7 +135,7 @@ class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
                                          imageName: String, 
                                          selectedImageName: String) -> UINavigationController {
         let navController = UINavigationController(rootViewController: rootViewController)
-        navController.navigationBar.prefersLargeTitles = true
+        navController.navigationBar.prefersLargeTitles = false
         
         rootViewController.title = title
         rootViewController.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: imageName), selectedImage: UIImage(systemName: selectedImageName))
