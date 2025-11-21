@@ -1,245 +1,145 @@
 import UIKit
 import SnapKit
 
-protocol XHSCustomTabBarDelegate: AnyObject {
-    func tabBar(_ tabBar: XHSCustomTabBar, didSelect index: Int)
-}
-
-// 自定义TabBar按钮，实现图片在上、文字在下的布局
-class CustomTabBarButton: UIButton {
-    
-    override var isSelected: Bool {
-        didSet {
-            setTitleColor(isSelected ? UIColor.red : UIColor.gray, for: .selected)
-            tintColor = isSelected ? UIColor.red : UIColor.gray
-        }
-    }
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        setupButton()
-    }
-    
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupButton()
-    }
-    
-    private func setupButton() {
-        // 设置按钮样式为图片在上，文字在下
-        imageEdgeInsets = UIEdgeInsets(top: 6, left: 0, bottom: 6, right: 0)
-        titleEdgeInsets = UIEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
-        titleLabel?.font = UIFont.systemFont(ofSize: 10)
-        titleLabel?.textAlignment = .center
-        contentEdgeInsets = UIEdgeInsets(top: 6, left: 8, bottom: 6, right: 8)
-    }
-    
-    func setupWithItem(_ item: UITabBarItem) {
-        setImage(item.image, for: .normal)
-        setImage(item.selectedImage, for: .selected)
-        setTitle(item.title, for: .normal)
-        setTitleColor(UIColor.gray, for: .normal)
-        setTitleColor(UIColor.red, for: .selected)
-        tintColor = UIColor.gray
-        adjustsImageWhenHighlighted = false
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        guard let titleLabel = titleLabel, let imageView = imageView else { return }
-        
-        // 设置图片在上方，文字在下方
-        let imageHeight = imageView.frame.height
-        let titleHeight = titleLabel.frame.height
-        
-        let totalHeight = imageHeight + titleHeight + 4 // 4是图片和文字之间的间距
-        let yOffset = (bounds.height - totalHeight) / 2
-        
-        imageView.frame = CGRect(
-            x: (bounds.width - imageView.frame.width) / 2,
-            y: yOffset,
-            width: imageView.frame.width,
-            height: imageView.frame.height
-        )
-        
-        titleLabel.frame = CGRect(
-            x: (bounds.width - titleLabel.frame.width) / 2,
-            y: imageView.frame.maxY + 4,
-            width: titleLabel.frame.width,
-            height: titleLabel.frame.height
-        )
-    }
-}
-
-class XHSCustomTabBar: UIView {
+class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
     
     // MARK: - Properties
-    weak var delegate: XHSCustomTabBarDelegate?
-    
-    private var tabBarButtons: [CustomTabBarButton] = []
-    private var tabBarItems: [UITabBarItem] = []
-    private var publishButton: UIButton!
-    private let publishButtonIndex = 2 // 发布按钮在中间位置
+    private var viewControllers: [UIViewController] = []
+    private let tabBarIndexMap = [0, 1, 2, 3, 4] // 将TabBar的索引(0,1,2,3)映射到viewControllers的索引(0,1,3,4)
+    private var selectedViewController: UIViewController?
+    private var selectedIndex: Int = 0
     
     // MARK: - UI Elements
-    private let backgroundView = UIView()
-    private let separatorLine = UIView()
+    private let customTabBar = XHSCustomTabBar()
+    private let containerView = UIView()
     
-    override init(frame: CGRect) {
-        super.init(frame: frame)
+    override func viewDidLoad() {
+        super.viewDidLoad()
         setupUI()
-    }
-    
-    required init?(coder: NSCoder) {
-        super.init(coder: coder)
-        setupUI()
+        setupViewControllers()
     }
     
     private func setupUI() {
-        backgroundColor = UIColor.clear
+        view.backgroundColor = .systemBackground
         
-        // 背景视图
-        backgroundView.backgroundColor = UIColor.systemBackground
-        backgroundView.layer.shadowColor = UIColor.black.cgColor
-        backgroundView.layer.shadowOffset = CGSize(width: 0, height: -1)
-        backgroundView.layer.shadowOpacity = 0.1
-        backgroundView.layer.shadowRadius = 3
-        addSubview(backgroundView)
+        // 添加容器视图
+        view.addSubview(containerView)
         
-        // 分隔线
-        separatorLine.backgroundColor = UIColor.systemGray5
-        addSubview(separatorLine)
+        // 添加自定义TabBar
+        view.addSubview(customTabBar)
+        customTabBar.delegate = self
         
-        // 设置约束
-        backgroundView.snp.makeConstraints { make in
+        // 使用SnapKit设置约束
+        containerView.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(customTabBar.snp.top)
+        }
+        
+        customTabBar.snp.makeConstraints { make in
+            make.leading.trailing.bottom.equalToSuperview()
+            make.height.equalTo(83) // TabBar的标准高度
+        }
+    }
+    
+    private func setupViewControllers() {
+        let homeNav = createNavigationController(
+            rootViewController: XHSHomeViewController(),
+            title: "首页",
+            imageName: "house.fill",
+            selectedImageName: "house.fill"
+        )
+        
+        let marketNav = createNavigationController(
+            rootViewController: XHSMarketViewController(),
+            title: "市集",
+            imageName: "bag.fill",
+            selectedImageName: "bag.fill"
+        )
+        
+        let messageNav = createNavigationController(
+            rootViewController: XHSMessageViewController(),
+            title: "消息",
+            imageName: "heart.fill",
+            selectedImageName: "heart.fill"
+        )
+        
+        let profileNav = createNavigationController(
+            rootViewController: XHSProfileViewController(),
+            title: "我",
+            imageName: "person.fill",
+            selectedImageName: "person.fill"
+        )
+        
+        let publishVC = XHSPublishViewController() // 发布视图控制器单独处理
+        
+        // 设置视图控制器数组 - 保持固定顺序
+        viewControllers = [homeNav, marketNav, publishVC, messageNav, profileNav]
+        
+        // 设置初始视图控制器
+        setSelectedViewController(at: 0)
+        
+        // 设置TabBar项 - 顺序为首页、市集、消息、我 (跳过发布按钮)
+        let tabBarItems: [UITabBarItem] = [
+            homeNav.tabBarItem,
+            marketNav.tabBarItem,
+            UITabBarItem(title: "", image: UIImage(systemName: "plus.circle.fill"), selectedImage: UIImage(systemName: "plus.circle.fill")), // 发布按钮占位
+            messageNav.tabBarItem,
+            profileNav.tabBarItem
+        ]
+        
+        customTabBar.setItems(tabBarItems, selectedIndex: 0)
+    }
+    
+    private func setSelectedViewController(at index: Int) {
+        // 移除当前视图控制器
+        selectedViewController?.removeFromParent()
+        selectedViewController?.view.removeFromSuperview()
+        
+        // 获取新的视图控制器
+        let newViewController = viewControllers[index]
+        
+        // 添加新的视图控制器
+        addChild(newViewController)
+        containerView.addSubview(newViewController.view)
+        
+        newViewController.view.snp.makeConstraints { make in
             make.edges.equalToSuperview()
         }
         
-        separatorLine.snp.makeConstraints { make in
-            make.top.leading.trailing.equalToSuperview()
-            make.height.equalTo(0.5)
+        newViewController.didMove(toParent: self)
+        selectedViewController = newViewController
+        selectedIndex = index
+        
+        // 更新TabBar选中状态
+        customTabBar.setSelectedIndex(index, animated: true)
+    }
+    
+    // MARK: - XHSCustomTabBarDelegate
+    func tabBar(_ tabBar: XHSCustomTabBar, didSelect index: Int) {
+        if index == 2 { // 发布按钮索引
+            // 弹出发布视图控制器
+            let publishVC = XHSPublishViewController()
+            let navController = UINavigationController(rootViewController: publishVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+        } else {
+            // TabBar索引映射到viewControllers索引
+            let viewControllerIndex = tabBarIndexMap[index]
+            // 切换到其他视图控制器
+            setSelectedViewController(at: viewControllerIndex)
         }
     }
     
-    func setItems(_ items: [UITabBarItem], selectedIndex: Int = 0) {
-        // 移除旧的按钮
-        tabBarButtons.forEach { $0.removeFromSuperview() }
-        tabBarButtons.removeAll()
+    private func createNavigationController(rootViewController: UIViewController,
+                                         title: String,
+                                         imageName: String,
+                                         selectedImageName: String) -> UINavigationController {
+        let navController = UINavigationController(rootViewController: rootViewController)
+        navController.navigationBar.prefersLargeTitles = true
         
-        tabBarItems = items
+        rootViewController.title = title
+        rootViewController.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: imageName), selectedImage: UIImage(systemName: selectedImageName))
         
-        // 创建TabBar按钮，但不包括发布按钮的位置
-        var validItems: [(item: UITabBarItem, index: Int)] = []
-        for (index, item) in items.enumerated() {
-            if index != publishButtonIndex {
-                validItems.append((item: item, index: index))
-            }
-        }
-        
-        // 为非发布项创建按钮
-        for (item, originalIndex) in validItems {
-            createTabBarButton(for: item, at: originalIndex)
-        }
-        
-        // 创建发布按钮
-        createPublishButton()
-    }
-    
-    private func createTabBarButton(for item: UITabBarItem, at index: Int) {
-        let button = CustomTabBarButton()
-        button.tag = index
-        button.setupWithItem(item)
-        
-        // 保存按钮引用
-        tabBarButtons.append(button)
-        
-        button.addTarget(self, action: #selector(tabBarButtonTapped(_:)), for: .touchUpInside)
-        
-        addSubview(button)
-        
-        // 初步约束，实际位置将在layoutSubviews中设置
-        button.snp.makeConstraints { make in
-            make.top.equalTo(separatorLine.snp.bottom).offset(8)
-            make.bottom.equalToSuperview().inset(8)
-        }
-    }
-    
-    override func layoutSubviews() {
-        super.layoutSubviews()
-        
-        // 计算每个按钮的宽度和发布按钮的位置
-        let tabBarWidth = bounds.width
-        let publishButtonWidth = 60 // 发布按钮宽度
-        let availableWidth = tabBarWidth - publishButtonWidth // 可用宽度
-        let buttonCount = 4 // 实际按钮数量 (首页、市集、消息、我)
-        let normalButtonWidth = availableWidth / CGFloat(buttonCount)
-        
-        // 设置每个按钮的位置
-        for button in tabBarButtons {
-            let buttonIndex = button.tag
-            var buttonX: CGFloat = 0
-            
-            // 计算按钮的X坐标，需要考虑发布按钮的位置
-            if buttonIndex < publishButtonIndex {
-                // 按钮在发布按钮之前
-                buttonX = CGFloat(buttonIndex) * normalButtonWidth
-            } else {
-                // 按钮在发布按钮之后，需要跳过发布按钮的宽度
-                buttonX = CGFloat(buttonIndex - 1) * normalButtonWidth + publishButtonWidth
-            }
-            
-            button.frame = CGRect(
-                x: buttonX,
-                y: separatorLine.frame.maxY + 8,
-                width: normalButtonWidth,
-                height: bounds.height - separatorLine.frame.maxY - 16
-            )
-        }
-        
-        // 重新设置发布按钮的位置
-        if let publishButton = publishButton {
-            publishButton.frame = CGRect(
-                x: (tabBarWidth - publishButtonWidth) / 2, // 居中
-                y: separatorLine.frame.maxY + 8 - 20, // 稍微向上突出
-                width: publishButtonWidth,
-                height: publishButtonWidth
-            )
-        }
-    }
-    
-    private func createPublishButton() {
-        publishButton = UIButton(type: .custom)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .normal)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .highlighted)
-        publishButton.tintColor = .red
-        publishButton.tag = publishButtonIndex
-        
-        addSubview(publishButton)
-        
-        // 发布按钮位于中央，稍微突出
-        publishButton.snp.makeConstraints { make in
-            make.centerX.equalToSuperview()
-            make.centerY.equalTo(separatorLine.snp.bottom).offset(30) // 突出到上方
-            make.width.height.equalTo(60)
-        }
-        
-        publishButton.addTarget(self, action: #selector(publishButtonTapped(_:)), for: .touchUpInside)
-    }
-    
-    @objc private func tabBarButtonTapped(_ sender: CustomTabBarButton) {
-        delegate?.tabBar(self, didSelect: sender.tag)
-    }
-    
-    @objc private func publishButtonTapped(_ sender: UIButton) {
-        // 发布按钮始终触发索引2
-        delegate?.tabBar(self, didSelect: publishButtonIndex)
-    }
-    
-    func setSelectedIndex(_ index: Int, animated: Bool = true) {
-        // 更新按钮选择状态
-        for button in tabBarButtons {
-            button.isSelected = button.tag == index
-        }
+        return navController
     }
 }
