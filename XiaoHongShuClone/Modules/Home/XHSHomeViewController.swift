@@ -32,15 +32,17 @@ class XHSHomeViewController: XHSBaseViewController {
         let input = XHSHomeViewModel.Input(
             viewDidLoad: Observable.just(()),
             refreshTrigger: refreshControl.rx.controlEvent(.valueChanged).asObservable(),
-            loadMoreTrigger: tableView.rx.willDisplayCell.asObservable().map { [weak self] _ in
-                // 检查是否接近底部
-                guard let self = self,
-                      self.tableView.numberOfRows(inSection: 0) > 0 else { return false }
-                
-                let lastRowIndex = self.tableView.numberOfRows(inSection: 0) - 1
-                let lastVisibleIndex = self.tableView.indexPathsForVisibleRows?.last?.row ?? 0
-                return lastVisibleIndex >= lastRowIndex - 1 // 在倒数第二个时开始加载
-            }.filter { $0 }
+            loadMoreTrigger: tableView.rx.willDisplayCell.asObservable()
+                .filter { [weak self] _ in
+                    // 检查是否接近底部
+                    guard let self = self,
+                          self.tableView.numberOfRows(inSection: 0) > 0 else { return false }
+                    
+                    let lastRowIndex = self.tableView.numberOfRows(inSection: 0) - 1
+                    let lastVisibleIndex = self.tableView.indexPathsForVisibleRows?.last?.row ?? 0
+                    return lastVisibleIndex >= lastRowIndex - 1 // 在倒数第二个时开始加载
+                }
+                .map { _ in () } // 将结果转换为Void
         )
         
         let output = viewModel.transform(input: input)

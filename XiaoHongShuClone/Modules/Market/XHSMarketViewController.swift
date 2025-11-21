@@ -33,20 +33,22 @@ class XHSMarketViewController: XHSBaseViewController {
         let input = XHSMarketViewModel.Input(
             viewDidLoad: Observable.just(()),
             refreshTrigger: refreshControl.rx.controlEvent(.valueChanged).asObservable(),
-            loadMoreTrigger: collectionView.rx.willDisplayCell.asObservable().map { [weak self] _ in
-                guard let self = self else { return false }
-                
-                let visibleItems = self.collectionView.indexPathsForVisibleItems
-                let numberOfItems = self.collectionView.numberOfItems(inSection: 0)
-                
-                guard numberOfItems > 0 else { return false }
-                
-                if let lastVisibleIndex = visibleItems.max(by: { $0.item < $1.item }) {
-                    return lastVisibleIndex.item >= numberOfItems - 2 // 接近底部时触发加载更多
+            loadMoreTrigger: collectionView.rx.willDisplayCell.asObservable()
+                .filter { [weak self] _ in
+                    guard let self = self else { return false }
+                    
+                    let visibleItems = self.collectionView.indexPathsForVisibleItems
+                    let numberOfItems = self.collectionView.numberOfItems(inSection: 0)
+                    
+                    guard numberOfItems > 0 else { return false }
+                    
+                    if let lastVisibleIndex = visibleItems.max(by: { $0.item < $1.item }) {
+                        return lastVisibleIndex.item >= numberOfItems - 2 // 接近底部时触发加载更多
+                    }
+                    
+                    return false
                 }
-                
-                return false
-            }.filter { $0 }
+                .map { _ in () } // 将结果转换为Void
         )
         
         let output = viewModel.transform(input: input)
