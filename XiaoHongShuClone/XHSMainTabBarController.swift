@@ -1,21 +1,43 @@
 import UIKit
+import SnapKit
 
-class XHSMainTabBarController: UITabBarController {
+class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
+    
+    // MARK: - Properties
+    private var viewControllers: [UIViewController] = []
+    private var selectedViewController: UIViewController?
+    private var selectedIndex: Int = 0
+    
+    // MARK: - UI Elements
+    private let customTabBar = XHSCustomTabBar()
+    private let containerView = UIView()
     
     override func viewDidLoad() {
         super.viewDidLoad()
-        setupTabBar()
+        setupUI()
         setupViewControllers()
     }
     
-    private func setupTabBar() {
-        tabBar.backgroundColor = .systemBackground
-        tabBar.tintColor = .red  // 小红书主题色
-        tabBar.unselectedItemTintColor = .gray
+    private func setupUI() {
+        view.backgroundColor = .systemBackground
         
-        // 隐藏TabBar分割线
-        tabBar.shadowImage = UIImage()
-        tabBar.backgroundImage = UIImage()
+        // 添加容器视图
+        view.addSubview(containerView)
+        
+        // 添加自定义TabBar
+        view.addSubview(customTabBar)
+        customTabBar.delegate = self
+        
+        // 使用SnapKit设置约束
+        containerView.snp.makeConstraints { make in
+            make.top.leading.trailing.equalToSuperview()
+            make.bottom.equalTo(customTabBar.snp.top)
+        }
+        
+        customTabBar.snp.makeConstraints { make in
+            make.leading.trailing.bottom.equalToSuperview()
+            make.height.equalTo(83) // TabBar的标准高度
+        }
     }
     
     private func setupViewControllers() {
@@ -47,44 +69,65 @@ class XHSMainTabBarController: UITabBarController {
             selectedImageName: "person.fill"
         )
         
-        // 设置视图控制器，不包含中间的发布按钮
-        viewControllers = [homeNav, marketNav, messageNav, profileNav]
+        let publishVC = XHSPublishViewController() // 发布视图控制器单独处理
         
-        // 添加发布按钮到tabbar中间位置
-        setupPublishButton()
+        // 设置视图控制器数组
+        viewControllers = [homeNav, marketNav, publishVC, messageNav, profileNav]
+        
+        // 设置初始视图控制器
+        setSelectedViewController(at: 0)
+        
+        // 设置TabBar项
+        let tabBarItems = viewControllers.map { vc in
+            var item = UITabBarItem()
+            if let navController = vc as? UINavigationController {
+                item = navController.tabBarItem
+            } else {
+                // 发布视图控制器没有导航控制器
+                item = UITabBarItem(title: "", image: UIImage(systemName: "plus.circle.fill"), selectedImage: UIImage(systemName: "plus.circle.fill"))
+            }
+            return item
+        }
+        
+        customTabBar.setItems(tabBarItems, selectedIndex: 0)
     }
     
-    private func setupPublishButton() {
-        let publishButton = UIButton(type: .custom)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .normal)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .highlighted)
-        publishButton.tintColor = .red
+    private func setSelectedViewController(at index: Int) {
+        // 移除当前视图控制器
+        selectedViewController?.removeFromParent()
+        selectedViewController?.view.removeFromSuperview()
         
-        // 设置按钮大小
-        publishButton.translatesAutoresizingMaskIntoConstraints = false
+        // 获取新的视图控制器
+        let newViewController = viewControllers[index]
         
-        // 添加按钮到TabBar
-        tabBar.addSubview(publishButton)
+        // 添加新的视图控制器
+        addChild(newViewController)
+        containerView.addSubview(newViewController.view)
         
-        // 设置按钮居中位置，确保兼容iOS 13+
-        NSLayoutConstraint.activate([
-            publishButton.centerXAnchor.constraint(equalTo: tabBar.centerXAnchor),
-            publishButton.widthAnchor.constraint(equalToConstant: 60),
-            publishButton.heightAnchor.constraint(equalToConstant: 60),
-            // 设置按钮在TabBar内部的垂直位置
-            publishButton.topAnchor.constraint(equalTo: tabBar.topAnchor, constant: -10),
-            publishButton.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor, constant: -10)
-        ])
+        newViewController.view.snp.makeConstraints { make in
+            make.edges.equalToSuperview()
+        }
         
-        // 添加点击事件
-        publishButton.addTarget(self, action: #selector(publishButtonTapped), for: .touchUpInside)
+        newViewController.didMove(toParent: self)
+        selectedViewController = newViewController
+        selectedIndex = index
+        
+        // 更新TabBar选中状态
+        customTabBar.setSelectedIndex(index, animated: true)
     }
     
-    @objc private func publishButtonTapped() {
-        let publishVC = XHSPublishViewController()
-        let navController = UINavigationController(rootViewController: publishVC)
-        navController.modalPresentationStyle = .fullScreen
-        present(navController, animated: true)
+    // MARK: - XHSCustomTabBarDelegate
+    func tabBar(_ tabBar: XHSCustomTabBar, didSelect index: Int) {
+        if index == 2 { // 发布按钮索引
+            // 弹出发布视图控制器
+            let publishVC = XHSPublishViewController()
+            let navController = UINavigationController(rootViewController: publishVC)
+            navController.modalPresentationStyle = .fullScreen
+            present(navController, animated: true)
+        } else {
+            // 切换到其他视图控制器
+            setSelectedViewController(at: index)
+        }
     }
     
     private func createNavigationController(rootViewController: UIViewController, 
@@ -95,9 +138,7 @@ class XHSMainTabBarController: UITabBarController {
         navController.navigationBar.prefersLargeTitles = true
         
         rootViewController.title = title
-        rootViewController.tabBarItem.title = title
-        rootViewController.tabBarItem.image = UIImage(systemName: imageName)
-        rootViewController.tabBarItem.selectedImage = UIImage(systemName: selectedImageName)
+        rootViewController.tabBarItem = UITabBarItem(title: title, image: UIImage(systemName: imageName), selectedImage: UIImage(systemName: selectedImageName))
         
         return navController
     }

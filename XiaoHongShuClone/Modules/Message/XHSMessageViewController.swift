@@ -147,13 +147,18 @@ class XHSMessageTableViewCell: UITableViewCell {
         
         nameLabel.font = UIFont.systemFont(ofSize: 16, weight: .medium)
         nameLabel.textColor = .label
+        nameLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        nameLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         contentLabel.font = UIFont.systemFont(ofSize: 14)
         contentLabel.textColor = .secondaryLabel
         contentLabel.numberOfLines = 1
+        contentLabel.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        contentLabel.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
         
         timeLabel.font = UIFont.systemFont(ofSize: 12)
         timeLabel.textColor = .tertiaryLabel
+        timeLabel.textAlignment = .right
         
         unreadCountLabel.backgroundColor = .red
         unreadCountLabel.textColor = .white
@@ -180,21 +185,21 @@ class XHSMessageTableViewCell: UITableViewCell {
             make.width.height.equalTo(50)
         }
         
-        nameLabel.snp.makeConstraints { make in
-            make.top.equalTo(avatarImageView)
-            make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
-            make.trailing.equalTo(timeLabel.snp.leading).inset(-8)
-        }
-        
         timeLabel.snp.makeConstraints { make in
-            make.top.equalTo(nameLabel)
+            make.top.equalToSuperview().offset(16)
             make.trailing.equalToSuperview().inset(16)
             make.width.lessThanOrEqualTo(80)
         }
         
+        nameLabel.snp.makeConstraints { make in
+            make.top.equalToSuperview().offset(14)
+            make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
+            make.trailing.equalTo(timeLabel.snp.leading).offset(-8)
+        }
+        
         contentLabel.snp.makeConstraints { make in
             make.top.equalTo(nameLabel.snp.bottom).offset(4)
-            make.leading.equalTo(nameLabel)
+            make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
             make.trailing.equalToSuperview().inset(16)
         }
         

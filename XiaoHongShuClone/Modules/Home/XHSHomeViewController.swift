@@ -206,12 +206,13 @@ class XHSFeedTableViewCell: UITableViewCell {
             make.top.equalToSuperview().offset(12)
             make.leading.equalToSuperview().offset(16)
             make.width.height.equalTo(40)
+            make.bottom.greaterThanOrEqualToSuperview().offset(-12) // 确保头像不会被压缩
         }
         
         usernameLabel.snp.makeConstraints { make in
-            make.top.equalTo(avatarImageView)
+            make.top.equalTo(avatarImageView).priority(.high) // 设置较低优先级以避免冲突
             make.leading.equalTo(avatarImageView.snp.trailing).offset(12)
-            make.trailing.equalToSuperview().inset(16)
+            make.trailing.lessThanOrEqualToSuperview().inset(16) // 使用lessThanOrEqualTo避免约束冲突
         }
         
         titleLabel.snp.makeConstraints { make in
@@ -242,6 +243,7 @@ class XHSFeedTableViewCell: UITableViewCell {
         commentsLabel.snp.makeConstraints { make in
             make.leading.equalTo(likesLabel.snp.trailing).offset(16)
             make.centerY.equalTo(likesLabel)
+            make.trailing.lessThanOrEqualToSuperview().inset(16) // 防止超出边界
             make.bottom.equalToSuperview().inset(12)
         }
     }
