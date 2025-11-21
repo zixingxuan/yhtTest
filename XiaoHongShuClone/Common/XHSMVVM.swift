@@ -10,7 +10,7 @@ protocol XHSViewModelType {
 }
 
 // MARK: - Base View Model Implementation
-class XHSMVVMViewModel: XHSViewModelType {
+class XHSMVVMViewModel {
     let disposeBag = DisposeBag()
     
     // Default implementation - should be overridden
@@ -18,8 +18,13 @@ class XHSMVVMViewModel: XHSViewModelType {
         fatalError("Subclasses must implement the transform method")
     }
     
-    struct Input {}
-    struct Output {}
+    struct Input {
+        // 默认空实现，子类可以继承
+    }
+    
+    struct Output {
+        // 默认空实现，子类可以继承
+    }
     
     init() {
         setupBindings()
@@ -100,13 +105,16 @@ enum XHSViewState {
 class XHSStateViewModel: XHSMVVMViewModel {
     let state = BehaviorRelay<XHSViewState>(value: .idle)
     
-    override func transform(input: XHSStateViewModel.Input) -> XHSStateViewModel.Output {
+    func transform(input: XHSStateViewModel.Input) -> XHSStateViewModel.Output {
         // Default implementation
         return Output(state: state.asObservable())
     }
     
-    struct Input: XHSViewModelType.Input {}
-    struct Output: XHSViewModelType.Output {
+    struct Input {
+        // XHSStateViewModel的输入参数
+    }
+    
+    struct Output {
         let state: Observable<XHSViewState>
     }
     
@@ -148,7 +156,7 @@ class XHSListViewModel<T>: XHSMVVMViewModel {
         return Observable.empty()
     }
     
-    override func transform(input: XHSListViewModel<T>.Input) -> XHSListViewModel<T>.Output {
+    func transform(input: XHSListViewModel<T>.Input) -> XHSListViewModel<T>.Output {
         let refreshTrigger = input.refreshTrigger?
             .flatMapLatest { [weak self] _ -> Observable<[T]> in
                 guard let self = self else { return Observable.empty() }
@@ -175,7 +183,7 @@ class XHSListViewModel<T>: XHSMVVMViewModel {
         )
     }
     
-    struct Input: XHSViewModelType.Input {
+    struct Input {
         let refreshTrigger: Observable<Void>?
         
         init(refreshTrigger: Observable<Void>? = nil) {
@@ -183,7 +191,7 @@ class XHSListViewModel<T>: XHSMVVMViewModel {
         }
     }
     
-    struct Output: XHSViewModelType.Output {
+    struct Output {
         let items: Observable<[T]>
         let isLoading: Observable<Bool>
         let error: Observable<Error>
