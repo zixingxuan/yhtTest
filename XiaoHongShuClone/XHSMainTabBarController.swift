@@ -5,6 +5,7 @@ class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
     
     // MARK: - Properties
     private var viewControllers: [UIViewController] = []
+    private let tabBarIndexMap = [0, 1, 3, 4] // 将TabBar的索引(0,1,2,3)映射到viewControllers的索引(0,1,3,4)
     private var selectedViewController: UIViewController?
     private var selectedIndex: Int = 0
     
@@ -71,23 +72,20 @@ class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
         
         let publishVC = XHSPublishViewController() // 发布视图控制器单独处理
         
-        // 设置视图控制器数组
+        // 设置视图控制器数组 - 保持固定顺序
         viewControllers = [homeNav, marketNav, publishVC, messageNav, profileNav]
         
         // 设置初始视图控制器
         setSelectedViewController(at: 0)
         
-        // 设置TabBar项
-        let tabBarItems = viewControllers.map { vc in
-            var item = UITabBarItem()
-            if let navController = vc as? UINavigationController {
-                item = navController.tabBarItem
-            } else {
-                // 发布视图控制器没有导航控制器
-                item = UITabBarItem(title: "", image: UIImage(systemName: "plus.circle.fill"), selectedImage: UIImage(systemName: "plus.circle.fill"))
-            }
-            return item
-        }
+        // 设置TabBar项 - 顺序为首页、市集、消息、我 (跳过发布按钮)
+        let tabBarItems = [
+            homeNav.tabBarItem,
+            marketNav.tabBarItem,
+            messageNav.tabBarItem,
+            profileNav.tabBarItem,
+            UITabBarItem(title: "", image: UIImage(systemName: "plus.circle.fill"), selectedImage: UIImage(systemName: "plus.circle.fill")) // 发布按钮占位
+        ]
         
         customTabBar.setItems(tabBarItems, selectedIndex: 0)
     }
@@ -125,8 +123,10 @@ class XHSMainTabBarController: UIViewController, XHSCustomTabBarDelegate {
             navController.modalPresentationStyle = .fullScreen
             present(navController, animated: true)
         } else {
+            // TabBar索引映射到viewControllers索引
+            let viewControllerIndex = tabBarIndexMap[index]
             // 切换到其他视图控制器
-            setSelectedViewController(at: index)
+            setSelectedViewController(at: viewControllerIndex)
         }
     }
     
