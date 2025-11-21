@@ -10,6 +10,7 @@ class XHSMarketViewController: XHSBaseViewController {
         frame: .zero,
         collectionViewLayout: UICollectionViewFlowLayout()
     )
+    private let refreshControl = UIRefreshControl()
     
     // MARK: - Properties
     private let viewModel = XHSMarketViewModel()
@@ -30,7 +31,22 @@ class XHSMarketViewController: XHSBaseViewController {
         super.bindViewModel()
         
         let input = XHSMarketViewModel.Input(
-            viewDidLoad: Observable.just(())
+            viewDidLoad: Observable.just(()),
+            refreshTrigger: refreshControl.rx.controlEvent(.valueChanged).asObservable(),
+            loadMoreTrigger: collectionView.rx.willDisplayCell.asObservable().map { [weak self] _ in
+                guard let self = self else { return false }
+                
+                let visibleItems = self.collectionView.indexPathsForVisibleItems
+                let numberOfItems = self.collectionView.numberOfItems(inSection: 0)
+                
+                guard numberOfItems > 0 else { return false }
+                
+                if let lastVisibleIndex = visibleItems.max(by: { $0.item < $1.item }) {
+                    return lastVisibleIndex.item >= numberOfItems - 2 // 接近底部时触发加载更多
+                }
+                
+                return false
+            }.filter { $0 }
         )
         
         let output = viewModel.transform(input: input)
@@ -46,6 +62,13 @@ class XHSMarketViewController: XHSBaseViewController {
                 cell.configure(with: item)
                 return cell
             }
+            .disposed(by: disposeBag)
+        
+        // 停止刷新控件
+        output.refreshComplete
+            .subscribe(onNext: { [weak self] _ in
+                self?.refreshControl.endRefreshing()
+            })
             .disposed(by: disposeBag)
         
         // 处理cell点击事件
@@ -77,35 +100,104 @@ class XHSMarketViewController: XHSBaseViewController {
         }
         
         collectionView.backgroundColor = .systemBackground
+        
+        // 添加下拉刷新
+        collectionView.refreshControl = refreshControl
     }
 }
 
 // MARK: - View Model
 class XHSMarketViewModel: XHSBaseViewModel {
     
+    private let networkService = XHSNetworkService.shared
+    private let productsSubject = BehaviorSubject<[XHSProductItem]>(value: [])
+    private var currentPage = 1
+    private let itemsPerPage = 10
+    private var isLoading = false
+    private var hasMore = true
+    
     override func transform(input: Input) -> Output {
-        let products = Observable.just(generateMockData())
+        // 初始加载数据
+        input.viewDidLoad
+            .subscribe(onNext: { [weak self] _ in
+                self?.loadData(page: 1, isRefresh: false)
+            })
+            .disposed(by: disposeBag)
         
-        return Output(products: products)
+        // 下拉刷新
+        input.refreshTrigger
+            .subscribe(onNext: { [weak self] _ in
+                self?.loadData(page: 1, isRefresh: true)
+            })
+            .disposed(by: disposeBag)
+        
+        // 上拉加载更多
+        input.loadMoreTrigger
+            .filter { [weak self] in
+                guard let self = self else { return false }
+                return !self.isLoading && self.hasMore
+            }
+            .subscribe(onNext: { [weak self] _ in
+                guard let self = self else { return }
+                self.loadData(page: self.currentPage + 1, isRefresh: false)
+            })
+            .disposed(by: disposeBag)
+        
+        return Output(
+            products: productsSubject.asObservable(),
+            refreshComplete: input.refreshTrigger.map { _ in () }
+        )
+    }
+    
+    private func loadData(page: Int, isRefresh: Bool) {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        networkService.fetchMarketProducts(page: page, limit: itemsPerPage)
+            .subscribe(
+                onNext: { [weak self] response in
+                    guard let self = self else { return }
+                    
+                    var currentItems = isRefresh ? [] : try? self.productsSubject.value() ?? []
+                    if isRefresh {
+                        currentItems = []
+                    }
+                    
+                    let newItems = response.items.map { item in
+                        XHSProductItem(
+                            id: item.id,
+                            name: item.name,
+                            price: item.price,
+                            imageUrl: item.imageUrl,
+                            shopName: item.shopName,
+                            sales: item.sales
+                        )
+                    }
+                    
+                    currentItems.append(contentsOf: newItems)
+                    
+                    self.productsSubject.onNext(currentItems)
+                    self.currentPage = page
+                    self.hasMore = response.hasMore
+                    self.isLoading = false
+                },
+                onError: { [weak self] error in
+                    print("Error loading market data: \(error)")
+                    self?.isLoading = false
+                }
+            )
+            .disposed(by: disposeBag)
     }
     
     struct Input {
         let viewDidLoad: Observable<Void>
+        let refreshTrigger: Observable<Void>
+        let loadMoreTrigger: Observable<Void>
     }
     
     struct Output {
         let products: Observable<[XHSProductItem]>
-    }
-    
-    private func generateMockData() -> [XHSProductItem] {
-        return [
-            XHSProductItem(id: "1", name: "夏日连衣裙", price: 299.0, imageUrl: "", shopName: "时尚小店", sales: 128),
-            XHSProductItem(id: "2", name: "美妆套装", price: 199.0, imageUrl: "", shopName: "美妆专营", sales: 256),
-            XHSProductItem(id: "3", name: "家居装饰", price: 89.0, imageUrl: "", shopName: "生活家居", sales: 98),
-            XHSProductItem(id: "4", name: "数码配件", price: 159.0, imageUrl: "", shopName: "数码潮品", sales: 76),
-            XHSProductItem(id: "5", name: "运动装备", price: 399.0, imageUrl: "", shopName: "运动天地", sales: 142),
-            XHSProductItem(id: "6", name: "图书文具", price: 49.0, imageUrl: "", shopName: "书香门第", sales: 210)
-        ]
+        let refreshComplete: Observable<Void>
     }
 }
 
@@ -148,6 +240,7 @@ class XHSMarketProductCell: UICollectionViewCell {
         productImageView.contentMode = .scaleAspectFill
         productImageView.clipsToBounds = true
         productImageView.layer.cornerRadius = 8
+        productImageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0) // 占位颜色
         
         nameLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         nameLabel.textColor = .label
@@ -205,7 +298,31 @@ class XHSMarketProductCell: UICollectionViewCell {
         shopNameLabel.text = item.shopName
         salesLabel.text = "销量 \(item.sales)"
         
-        // 这里应该设置图片，暂时用背景色代替
-        productImageView.backgroundColor = UIColor(red: 0.9, green: 0.9, blue: 0.9, alpha: 1.0)
+        // 模拟使用Kingfisher加载图片 (实际需要导入Kingfisher库)
+        // 这里使用模拟的异步加载
+        loadImageAsync(from: item.imageUrl, into: productImageView)
+    }
+    
+    private func loadImageAsync(from urlString: String, into imageView: UIImageView) {
+        // 模拟图片加载
+        guard let url = URL(string: urlString), !urlString.isEmpty else {
+            imageView.image = nil
+            return
+        }
+        
+        // 设置占位图
+        imageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+        
+        // 模拟异步加载
+        DispatchQueue.global().async {
+            // 模拟网络请求延迟
+            usleep(100000) // 0.1秒
+            
+            DispatchQueue.main.async {
+                // 设置模拟图片
+                imageView.backgroundColor = UIColor(hue: CGFloat.random(in: 0...1), saturation: 0.7, brightness: 0.9, alpha: 1.0)
+                imageView.image = nil
+            }
+        }
     }
 }

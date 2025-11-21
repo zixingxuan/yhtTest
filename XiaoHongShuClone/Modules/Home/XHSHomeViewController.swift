@@ -8,6 +8,7 @@ class XHSHomeViewController: XHSBaseViewController {
     // MARK: - UI Elements
     private let tableView = UITableView()
     private let headerView = XHSHomeHeaderView()
+    private let refreshControl = UIRefreshControl()
     
     // MARK: - Properties
     private let viewModel = XHSHomeViewModel()
@@ -29,7 +30,17 @@ class XHSHomeViewController: XHSBaseViewController {
         super.bindViewModel()
         
         let input = XHSHomeViewModel.Input(
-            viewDidLoad: Observable.just(())
+            viewDidLoad: Observable.just(()),
+            refreshTrigger: refreshControl.rx.controlEvent(.valueChanged).asObservable(),
+            loadMoreTrigger: tableView.rx.willDisplayCell.asObservable().map { [weak self] _ in
+                // 检查是否接近底部
+                guard let self = self,
+                      self.tableView.numberOfRows(inSection: 0) > 0 else { return false }
+                
+                let lastRowIndex = self.tableView.numberOfRows(inSection: 0) - 1
+                let lastVisibleIndex = self.tableView.indexPathsForVisibleRows?.last?.row ?? 0
+                return lastVisibleIndex >= lastRowIndex - 1 // 在倒数第二个时开始加载
+            }.filter { $0 }
         )
         
         let output = viewModel.transform(input: input)
@@ -41,6 +52,13 @@ class XHSHomeViewController: XHSBaseViewController {
                 cell.configure(with: item)
                 return cell
             }
+            .disposed(by: disposeBag)
+        
+        // 停止刷新控件
+        output.refreshComplete
+            .subscribe(onNext: { [weak self] _ in
+                self?.refreshControl.endRefreshing()
+            })
             .disposed(by: disposeBag)
         
         // 处理cell点击事件
@@ -62,6 +80,9 @@ class XHSHomeViewController: XHSBaseViewController {
         tableView.register(XHSFeedTableViewCell.self, forCellReuseIdentifier: "FeedCell")
         tableView.separatorStyle = .none
         tableView.backgroundColor = UIColor(red: 0.98, green: 0.95, blue: 0.92, alpha: 1.0) // 小红书背景色
+        
+        // 添加下拉刷新
+        tableView.refreshControl = refreshControl
     }
     
     private func setupHeaderView() {
@@ -73,28 +94,96 @@ class XHSHomeViewController: XHSBaseViewController {
 // MARK: - View Model
 class XHSHomeViewModel: XHSBaseViewModel {
     
+    private let networkService = XHSNetworkService.shared
+    private let feedItemsSubject = BehaviorSubject<[XHSFeedItem]>(value: [])
+    private var currentPage = 1
+    private let itemsPerPage = 10
+    private var isLoading = false
+    private var hasMore = true
+    
     override func transform(input: Input) -> Output {
-        let feedItems = Observable.just(generateMockData())
+        // 初始加载数据
+        input.viewDidLoad
+            .subscribe(onNext: { [weak self] _ in
+                self?.loadData(page: 1, isRefresh: false)
+            })
+            .disposed(by: disposeBag)
         
-        return Output(feedItems: feedItems)
+        // 下拉刷新
+        input.refreshTrigger
+            .subscribe(onNext: { [weak self] _ in
+                self?.loadData(page: 1, isRefresh: true)
+            })
+            .disposed(by: disposeBag)
+        
+        // 上拉加载更多
+        input.loadMoreTrigger
+            .filter { [weak self] in
+                guard let self = self else { return false }
+                return !self.isLoading && self.hasMore
+            }
+            .subscribe(onNext: { [weak self] _ in
+                guard let self = self else { return }
+                self.loadData(page: self.currentPage + 1, isRefresh: false)
+            })
+            .disposed(by: disposeBag)
+        
+        return Output(
+            feedItems: feedItemsSubject.asObservable(),
+            refreshComplete: input.refreshTrigger.map { _ in () }
+        )
+    }
+    
+    private func loadData(page: Int, isRefresh: Bool) {
+        guard !isLoading else { return }
+        isLoading = true
+        
+        networkService.fetchHomeFeed(page: page, limit: itemsPerPage)
+            .subscribe(
+                onNext: { [weak self] response in
+                    guard let self = self else { return }
+                    
+                    var currentItems = isRefresh ? [] : try? self.feedItemsSubject.value() ?? []
+                    if isRefresh {
+                        currentItems = []
+                    }
+                    
+                    let newItems = response.items.map { item in
+                        XHSFeedItem(
+                            id: item.id,
+                            title: item.title,
+                            content: item.content,
+                            imageUrl: item.imageUrl,
+                            username: item.username,
+                            likes: item.likes,
+                            comments: item.comments
+                        )
+                    }
+                    
+                    currentItems.append(contentsOf: newItems)
+                    
+                    self.feedItemsSubject.onNext(currentItems)
+                    self.currentPage = page
+                    self.hasMore = response.hasMore
+                    self.isLoading = false
+                },
+                onError: { [weak self] error in
+                    print("Error loading data: \(error)")
+                    self?.isLoading = false
+                }
+            )
+            .disposed(by: disposeBag)
     }
     
     struct Input {
         let viewDidLoad: Observable<Void>
+        let refreshTrigger: Observable<Void>
+        let loadMoreTrigger: Observable<Void>
     }
     
     struct Output {
         let feedItems: Observable<[XHSFeedItem]>
-    }
-    
-    private func generateMockData() -> [XHSFeedItem] {
-        return [
-            XHSFeedItem(id: "1", title: "夏日穿搭分享", content: "今天分享几套适合夏天的搭配", imageUrl: "", username: "时尚达人", likes: 128, comments: 24),
-            XHSFeedItem(id: "2", title: "美食探店", content: "发现了一家超棒的咖啡厅", imageUrl: "", username: "吃货小分队", likes: 256, comments: 42),
-            XHSFeedItem(id: "3", title: "旅行攻略", content: "周末去杭州的行程安排", imageUrl: "", username: "旅行家", likes: 512, comments: 87),
-            XHSFeedItem(id: "4", title: "美妆心得", content: "新入手的口红试色", imageUrl: "", username: "美妆博主", likes: 342, comments: 32),
-            XHSFeedItem(id: "5", title: "家居布置", content: "小户型收纳技巧", imageUrl: "", username: "生活家", likes: 198, comments: 18)
-        ]
+        let refreshComplete: Observable<Void>
     }
 }
 
@@ -168,6 +257,7 @@ class XHSFeedTableViewCell: UITableViewCell {
         avatarImageView.contentMode = .scaleAspectFill
         avatarImageView.layer.cornerRadius = 20
         avatarImageView.clipsToBounds = true
+        avatarImageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0) // 占位颜色
         
         usernameLabel.font = UIFont.systemFont(ofSize: 14, weight: .medium)
         usernameLabel.textColor = .label
@@ -183,6 +273,7 @@ class XHSFeedTableViewCell: UITableViewCell {
         imageViewContainer.contentMode = .scaleAspectFill
         imageViewContainer.clipsToBounds = true
         imageViewContainer.layer.cornerRadius = 8
+        imageViewContainer.backgroundColor = UIColor(white: 0.9, alpha: 1.0) // 占位颜色
         
         likesLabel.font = UIFont.systemFont(ofSize: 12)
         likesLabel.textColor = .secondaryLabel
@@ -254,5 +345,33 @@ class XHSFeedTableViewCell: UITableViewCell {
         contentLabel.text = item.content
         likesLabel.text = " 💖 \(item.likes)"
         commentsLabel.text = " 💬 \(item.comments)"
+        
+        // 模拟使用Kingfisher加载图片 (实际需要导入Kingfisher库)
+        // 这里使用模拟的异步加载
+        loadImageAsync(from: item.imageUrl, into: imageViewContainer)
+        loadImageAsync(from: "https://example.com/avatar_\(item.username).jpg", into: avatarImageView)
+    }
+    
+    private func loadImageAsync(from urlString: String, into imageView: UIImageView) {
+        // 模拟图片加载
+        guard let url = URL(string: urlString), !urlString.isEmpty else {
+            imageView.image = nil
+            return
+        }
+        
+        // 设置占位图
+        imageView.backgroundColor = UIColor(white: 0.9, alpha: 1.0)
+        
+        // 模拟异步加载
+        DispatchQueue.global().async {
+            // 模拟网络请求延迟
+            usleep(100000) // 0.1秒
+            
+            DispatchQueue.main.async {
+                // 设置模拟图片
+                imageView.backgroundColor = UIColor(hue: CGFloat.random(in: 0...1), saturation: 0.7, brightness: 0.9, alpha: 1.0)
+                imageView.image = nil
+            }
+        }
     }
 }
