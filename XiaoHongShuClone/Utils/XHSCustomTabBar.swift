@@ -151,24 +151,61 @@ class XHSCustomTabBar: UIView {
         button.tag = index
         button.setupWithItem(item)
         
+        // 保存按钮引用
+        tabBarButtons.append(button)
+        
         button.addTarget(self, action: #selector(tabBarButtonTapped(_:)), for: .touchUpInside)
         
         addSubview(button)
         
-        // 使用SnapKit布局
+        // 初步约束，实际位置将在layoutSubviews中设置
         button.snp.makeConstraints { make in
             make.top.equalTo(separatorLine.snp.bottom).offset(8)
             make.bottom.equalToSuperview().inset(8)
-            make.width.equalToSuperview().dividedBy(CGFloat(tabBarItems.count - 1)) // 减1因为发布按钮不占tab位置
-            make.centerX.equalToSuperview().multipliedBy(CGFloat(calculateButtonCenterX(for: index))).priority(.high)
         }
     }
     
-    private func calculateButtonCenterX(for index: Int) -> Double {
-        // 计算避开发布按钮位置的按钮中心X坐标
-        let totalValidItems = tabBarItems.count - 1 // 减去发布按钮
-        let validIndex = index >= publishButtonIndex ? index - 1 : index
-        return Double(validIndex + 1) / Double(totalValidItems + 1)
+    override func layoutSubviews() {
+        super.layoutSubviews()
+        
+        // 计算每个按钮的宽度和发布按钮的位置
+        let tabBarWidth = bounds.width
+        let publishButtonWidth = 60 // 发布按钮宽度
+        let availableWidth = tabBarWidth - publishButtonWidth // 可用宽度
+        let buttonCount = 4 // 实际按钮数量 (首页、市集、消息、我)
+        let normalButtonWidth = availableWidth / CGFloat(buttonCount)
+        
+        // 设置每个按钮的位置
+        for button in tabBarButtons {
+            let buttonIndex = button.tag
+            var buttonX: CGFloat = 0
+            
+            // 计算按钮的X坐标，需要考虑发布按钮的位置
+            if buttonIndex < publishButtonIndex {
+                // 按钮在发布按钮之前
+                buttonX = CGFloat(buttonIndex) * normalButtonWidth
+            } else {
+                // 按钮在发布按钮之后，需要跳过发布按钮的宽度
+                buttonX = CGFloat(buttonIndex - 1) * normalButtonWidth + publishButtonWidth
+            }
+            
+            button.frame = CGRect(
+                x: buttonX,
+                y: separatorLine.frame.maxY + 8,
+                width: normalButtonWidth,
+                height: bounds.height - separatorLine.frame.maxY - 16
+            )
+        }
+        
+        // 重新设置发布按钮的位置
+        if let publishButton = publishButton {
+            publishButton.frame = CGRect(
+                x: (tabBarWidth - publishButtonWidth) / 2, // 居中
+                y: separatorLine.frame.maxY + 8 - 20, // 稍微向上突出
+                width: publishButtonWidth,
+                height: publishButtonWidth
+            )
+        }
     }
     
     private func createPublishButton() {
