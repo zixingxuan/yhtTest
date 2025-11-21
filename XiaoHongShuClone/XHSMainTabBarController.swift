@@ -33,13 +33,6 @@ class XHSMainTabBarController: UITabBarController {
             selectedImageName: "bag.fill"
         )
         
-        let publishNav = createNavigationController(
-            rootViewController: XHSPublishViewController(),
-            title: "",
-            imageName: "plus.circle.fill",
-            selectedImageName: "plus.circle.fill"
-        )
-        
         let messageNav = createNavigationController(
             rootViewController: XHSMessageViewController(),
             title: "消息",
@@ -54,34 +47,39 @@ class XHSMainTabBarController: UITabBarController {
             selectedImageName: "person.fill"
         )
         
-        // 设置中间按钮为发布按钮
-        viewControllers = [homeNav, marketNav, UIViewController(), publishNav, messageNav, profileNav]
+        // 设置视图控制器，不包含中间的发布按钮
+        viewControllers = [homeNav, marketNav, messageNav, profileNav]
         
-        // 配置发布按钮
-        let publishItem = tabBar.items?[3]
-        publishItem?.isEnabled = false  // 临时禁用，通过其他方式处理中间按钮
-        
-        // 实际的发布按钮
+        // 添加发布按钮到tabbar中间位置
         setupPublishButton()
     }
     
     private func setupPublishButton() {
         let publishButton = UIButton(type: .custom)
-        publishButton.frame = CGRect(x: 0, y: 0, width: 60, height: 60)
         publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
         publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill"), for: .highlighted)
         publishButton.tintColor = .red
         
+        // 设置按钮大小
+        publishButton.translatesAutoresizingMaskIntoConstraints = false
+        
         // 添加按钮到TabBar
         tabBar.addSubview(publishButton)
         
-        // 设置按钮位置
-        publishButton.translatesAutoresizingMaskIntoConstraints = false
+        // 设置按钮居中位置，确保兼容iOS 13+
         NSLayoutConstraint.activate([
             publishButton.centerXAnchor.constraint(equalTo: tabBar.centerXAnchor),
-            publishButton.centerYAnchor.constraint(equalTo: tabBar.topAnchor, constant: -10),
             publishButton.widthAnchor.constraint(equalToConstant: 60),
-            publishButton.heightAnchor.constraint(equalToConstant: 60)
+            publishButton.heightAnchor.constraint(equalToConstant: 60),
+            // 适配安全区域，兼容不同设备
+            publishButton.topAnchor.constraint(
+                greaterThanOrEqualTo: tabBar.topAnchor,
+                constant: 8
+            ),
+            publishButton.bottomAnchor.constraint(
+                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
+                constant: -8
+            )
         ])
         
         // 添加点击事件
