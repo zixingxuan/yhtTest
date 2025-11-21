@@ -56,8 +56,8 @@ class XHSMainTabBarController: UITabBarController {
     
     private func setupPublishButton() {
         let publishButton = UIButton(type: .custom)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill"), for: .normal)
-        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill"), for: .highlighted)
+        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .normal)
+        publishButton.setBackgroundImage(UIImage(systemName: "plus.circle.fill", withConfiguration: UIImage.SymbolConfiguration(pointSize: 30, weight: .regular)), for: .highlighted)
         publishButton.tintColor = .red
         
         // 设置按钮大小
@@ -71,15 +71,9 @@ class XHSMainTabBarController: UITabBarController {
             publishButton.centerXAnchor.constraint(equalTo: tabBar.centerXAnchor),
             publishButton.widthAnchor.constraint(equalToConstant: 60),
             publishButton.heightAnchor.constraint(equalToConstant: 60),
-            // 适配安全区域，兼容不同设备
-            publishButton.topAnchor.constraint(
-                greaterThanOrEqualTo: tabBar.topAnchor,
-                constant: 8
-            ),
-            publishButton.bottomAnchor.constraint(
-                equalTo: view.safeAreaLayoutGuide.bottomAnchor,
-                constant: -8
-            )
+            // 设置按钮在TabBar内部的垂直位置
+            publishButton.topAnchor.constraint(equalTo: tabBar.topAnchor, constant: -10),
+            publishButton.bottomAnchor.constraint(equalTo: tabBar.bottomAnchor, constant: -10)
         ])
         
         // 添加点击事件
